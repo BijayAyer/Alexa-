@@ -39,3 +39,13 @@ def test_tools_respond_safely_when_inputs_or_history_are_missing():
     assert "saved topics" in server.list_topics().lower()
     assert "active quiz" in server.answer_question("answer").lower()
     assert "quiz history" in server.what_to_review().lower()
+
+
+def test_short_model_quiz_is_filled_from_notes(monkeypatch):
+    server.add_notes("Biology", "Plants absorb sunlight. Chlorophyll captures light. Glucose stores energy.")
+    monkeypatch.setattr(server.llm, "complete_json", lambda *_: [
+        {"question": "What stores energy?", "answer": "glucose"}
+    ])
+
+    assert server.start_quiz("Biology", 3).startswith("Question 1 of 3:")
+    assert db.quiz_score(db.get_active_question()["session_id"])[1] == 3

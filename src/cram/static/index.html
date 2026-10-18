@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Cram</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <h1>Cram</h1>
+        <p>A study assistant for Alexa+. This page simulates Alexa+ talking to the Cram server.</p>
+      </header>
+
+      <div class="workspace">
+        <section class="chat" aria-labelledby="chat-heading">
+          <h2 id="chat-heading">chat</h2>
+          <div id="conversation" class="conversation" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+          <form id="chat-form" class="chat-form">
+            <label for="message">your message</label>
+            <div class="input-row">
+              <input id="message" name="message" type="text" autocomplete="off" required>
+              <button id="speak-button" type="button" hidden>Speak</button>
+              <button id="send-button" type="submit">Send</button>
+            </div>
+            <label class="read-option">
+              <input id="read-aloud" type="checkbox">
+              <span>read replies aloud</span>
+            </label>
+          </form>
+
+          <nav class="examples" aria-label="example messages">
+            <a href="#" data-message="add notes about photosynthesis: plants turn light into sugar">add notes about photosynthesis: plants turn light into sugar</a>
+            <a href="#" data-message="quiz me on photosynthesis">quiz me on photosynthesis</a>
+            <a href="#" data-message="what should I review">what should I review</a>
+          </nav>
+          <p id="status" class="status" role="status"></p>
+        </section>
+
+        <aside class="notes" aria-labelledby="notes-heading">
+          <h2 id="notes-heading">your notes</h2>
+          <div id="topic-list" class="topic-list" aria-live="polite"></div>
+          <button id="reset-button" type="button">reset conversation</button>
+        </aside>
+      </div>
+    </main>
+  </body>
+</html>

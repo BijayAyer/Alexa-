@@ -6,6 +6,8 @@ import secrets
 
 import uvicorn
 from dotenv import load_dotenv
+load_dotenv()
+
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -14,7 +16,6 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from cram import db, llm
 from cram.quiz import answer_is_correct, fallback_questions
 
-load_dotenv()
 mcp = FastMCP("Cram", host="0.0.0.0", port=8000)
 
 
@@ -105,8 +106,17 @@ def start_quiz(topic: str, num_questions: int = 3) -> str:
                         questions.append({"question": question, "answer": answer})
                 if len(questions) == count:
                     break
+        fallback = fallback_questions(notes, count)
         if not questions:
-            questions = fallback_questions(notes, count)
+            questions = fallback
+        else:
+            seen = {item["question"].casefold() for item in questions}
+            for item in fallback:
+                if item["question"].casefold() not in seen:
+                    questions.append(item)
+                    seen.add(item["question"].casefold())
+                if len(questions) == count:
+                    break
         if not questions:
             return "I couldn't make a quiz from those notes. Try adding a few complete sentences."
         db.create_quiz(topic, questions)

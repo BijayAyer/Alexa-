@@ -45,7 +45,7 @@ def complete_json(system: str, prompt: str) -> Any | None:
         request = prompt if attempt == 0 else f"{prompt}\nReturn only valid JSON, with no code fences."
         text = complete(system, request)
         if text is None:
-            return None
+            continue
         cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE)
         try:
             return json.loads(cleaned)
