@@ -10,3 +10,4 @@
 - A short model-generated quiz contained fewer questions than requested. Added distinct note-based fallback questions to fill the requested count, with a regression test.
 - Starlette's TestClient emitted a deprecation warning for its current `httpx` integration, but requests still passed. Kept the required `httpx` dependency and confirmed the runtime web routes and assets directly.
 - A fresh HTTPS clone of the requested GitHub URL returned `Repository not found`, although authenticated pushes succeeded. Used a clean local clone of the committed repository for the final install/test check; no credential changes were made.
+- Stopping the long-running MCP server while an Inspector-style SSE stream was closing printed `anyio.ClosedResourceError` from the SDK's standalone SSE writer. This occurred only during process shutdown; all health checks and MCP tool requests had already completed successfully.
