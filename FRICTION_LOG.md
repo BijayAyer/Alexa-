@@ -9,3 +9,4 @@
 - A local model returned several unrelated tool calls for one quiz request, and on a later request raised a Strands `APIError` after the MCP quiz tool had already succeeded. Restricting obvious requests to their matching tool and recovering a successful MCP result from Strands history prevents unrelated side effects and still returns the question.
 - A short model-generated quiz contained fewer questions than requested. Added distinct note-based fallback questions to fill the requested count, with a regression test.
 - Starlette's TestClient emitted a deprecation warning for its current `httpx` integration, but requests still passed. Kept the required `httpx` dependency and confirmed the runtime web routes and assets directly.
+- A fresh HTTPS clone of the requested GitHub URL returned `Repository not found`, although authenticated pushes succeeded. Used a clean local clone of the committed repository for the final install/test check; no credential changes were made.
