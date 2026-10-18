@@ -1,6 +1,7 @@
 """Small FastAPI app that simulates Alexa+ with a Strands agent."""
 
 import asyncio
+from io import BytesIO
 import os
 import re
 from contextlib import asynccontextmanager
@@ -10,10 +11,11 @@ import uvicorn
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from pypdf import PdfReader
 from strands import Agent
 from strands.models.openai import OpenAIModel
 from strands.tools.mcp import MCPClient
@@ -24,16 +26,18 @@ STATIC = Path(__file__).parent / "static"
 SYSTEM_PROMPT = (
     "You are a simulated Alexa+ voice assistant helping a student. Always use the Cram tools for study requests. "
     "To save notes use add_notes. To list topics use list_topics. For a summary use summarize_topic. "
+    "To answer study questions from saved notes use answer_from_notes. "
     "To start a quiz use start_quiz. When the user is answering a quiz question use answer_question. "
     "To hear the question again use repeat_question. For what to study next use what_to_review. "
     "Keep spoken replies short and plain, no markdown."
 )
 TOOLS = {
     "notes": "add_notes",
+    "study_answer": "answer_from_notes",
+    "quiz_answer": "answer_question",
     "topics": "list_topics",
     "summary": "summarize_topic",
     "quiz": "start_quiz",
-    "answer": "answer_question",
     "repeat": "repeat_question",
     "review": "what_to_review",
 }
@@ -57,10 +61,12 @@ def obvious_tool(message: str) -> str | None:
         return TOOLS["repeat"]
     if any(word in text for word in ("review", "study next", "what should i study")):
         return TOOLS["review"]
+    if "?" in text or text.startswith(("what is", "what are", "how does", "how do", "why does", "why do", "explain", "tell me about")):
+        return TOOLS["study_answer"]
     if db.get_active_question() and any(
         text.startswith(prefix) for prefix in ("the answer is", "i think", "it's", "it is")
     ):
-        return TOOLS["answer"]
+        return TOOLS["quiz_answer"]
     return None
 
 
@@ -120,6 +126,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+MAX_PDF_BYTES = 10 * 1024 * 1024
+MAX_PDF_PAGES = 100
+
+
+def extract_pdf_text(pdf_bytes: bytes) -> str:
+    reader = PdfReader(BytesIO(pdf_bytes))
+    if len(reader.pages) > MAX_PDF_PAGES:
+        raise ValueError(f"PDFs can have up to {MAX_PDF_PAGES} pages.")
+    text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+    if not text:
+        raise ValueError("No selectable text was found. Scanned PDFs need OCR before upload.")
+    return text[:100_000]
 
 
 @app.get("/")
@@ -130,6 +148,45 @@ async def home() -> FileResponse:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/api/materials/text")
+async def save_material_text(topic: str = Form(), text: str = Form()) -> dict[str, str]:
+    topic, text = topic.strip(), text.strip()
+    if not topic or not text:
+        raise HTTPException(status_code=422, detail="Enter a topic and study notes.")
+    if len(text) > 100_000:
+        raise HTTPException(status_code=413, detail="Study notes must be under 100,000 characters.")
+    try:
+        db.add_note(topic, text)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Could not save these study notes.") from exc
+    return {"status": "saved", "topic": topic}
+
+
+@app.post("/api/materials/pdf")
+async def upload_material_pdf(topic: str = Form(), file: UploadFile = File()) -> dict[str, str]:
+    topic = topic.strip()
+    if not topic:
+        raise HTTPException(status_code=422, detail="Enter a topic for this PDF.")
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=415, detail="Choose a PDF file.")
+    pdf_bytes = await file.read(MAX_PDF_BYTES + 1)
+    if len(pdf_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDFs must be 10 MB or smaller.")
+    if not pdf_bytes.startswith(b"%PDF-"):
+        raise HTTPException(status_code=415, detail="This file does not look like a valid PDF.")
+    try:
+        text = extract_pdf_text(pdf_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=415, detail="The PDF could not be read. It may be damaged or password-protected.") from exc
+    try:
+        db.add_note(topic, text)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Could not save this PDF's text.") from exc
+    return {"status": "saved", "topic": topic, "filename": file.filename}
 
 
 @app.post("/api/chat")

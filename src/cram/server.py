@@ -84,6 +84,36 @@ def summarize_topic(topic: str) -> str:
 
 
 @mcp.tool()
+def answer_from_notes(question: str, topic: str) -> str:
+    """Answer a student's study question using only their saved notes or uploaded PDF text for a topic."""
+    try:
+        notes = db.get_notes(topic.strip())
+        if not notes:
+            return _short(f"I don't have study material on {topic.strip()} yet. Add notes or a PDF first.")
+        sentences = [sentence for note in notes for sentence in _sentences(note)]
+        question_words = set(re.findall(r"[a-z0-9]+", question.casefold()))
+        stop_words = {"what", "when", "where", "which", "who", "whom", "whose", "why", "how", "does", "do", "did", "is", "are", "was", "were", "the", "a", "an", "in", "on", "of", "for", "to", "and", "or", "with", "from", "about", "explain", "tell", "me", "please"}
+        keywords = question_words - stop_words
+        ranked = sorted(
+            ((len(keywords & set(re.findall(r"[a-z0-9]+", sentence.casefold()))), sentence)
+             for sentence in sentences),
+            key=lambda item: item[0], reverse=True,
+        )
+        context = " ".join(sentence for score, sentence in ranked[:5] if score > 0)[:7000]
+        if not context:
+            return "I couldn't find that in your saved study material."
+        answer = llm.complete(
+            "Answer the student's question using only the supplied study material. Do not add outside facts. If the material does not contain the answer, say: I couldn't find that in your saved study material. Reply in a short spoken sentence, without markdown.",
+            f"Study material:\n{context}\n\nQuestion: {question.strip()}",
+        )
+        if answer:
+            return _short(answer)
+        return _short(context)
+    except Exception:
+        return "I couldn't answer from your study material just now. Please try again."
+
+
+@mcp.tool()
 def start_quiz(topic: str, num_questions: int = 3) -> str:
     """Start a one-question-at-a-time quiz using only the student's saved notes on a topic."""
     try:

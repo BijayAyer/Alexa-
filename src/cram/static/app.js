@@ -5,6 +5,7 @@ const sendButton = document.querySelector("#send-button");
 const speakButton = document.querySelector("#speak-button");
 const readAloud = document.querySelector("#read-aloud");
 const status = document.querySelector("#status");
+const materialStatus = document.querySelector("#material-status");
 const topicList = document.querySelector("#topic-list");
 
 function addMessage(label, text, tools = []) {
@@ -71,9 +72,51 @@ async function refreshState() {
       topicList.append(section);
     }
   } catch {
-    topicList.textContent = "Notes are unavailable right now.";
+    topicList.textContent = "Saved topics are unavailable right now.";
   }
 }
+
+document.querySelector("#text-material-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  materialStatus.textContent = "Saving notes.";
+  try {
+    const response = await fetch("/api/materials/text", { method: "POST", body: formData });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Could not save notes.");
+    event.currentTarget.reset();
+    materialStatus.textContent = `Notes saved for ${result.topic}. Ask Cram a question or start a quiz.`;
+    await refreshState();
+  } catch (error) {
+    materialStatus.textContent = error.message || "Could not save notes.";
+  }
+});
+
+document.querySelector("#pdf-material-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const topic = document.querySelector("#material-topic").value.trim();
+  const fileInput = document.querySelector("#material-pdf");
+  if (!topic) {
+    materialStatus.textContent = "Enter a topic before uploading the PDF.";
+    document.querySelector("#material-topic").focus();
+    return;
+  }
+  if (!fileInput.files.length) return;
+  const formData = new FormData();
+  formData.set("topic", topic);
+  formData.set("file", fileInput.files[0]);
+  materialStatus.textContent = "Reading the PDF.";
+  try {
+    const response = await fetch("/api/materials/pdf", { method: "POST", body: formData });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Could not read this PDF.");
+    event.currentTarget.reset();
+    materialStatus.textContent = `Added ${result.filename} to ${result.topic}. Ask Cram a question or start a quiz.`;
+    await refreshState();
+  } catch (error) {
+    materialStatus.textContent = error.message || "Could not read this PDF.";
+  }
+});
 
 async function sendMessage(message) {
   const text = message.trim();

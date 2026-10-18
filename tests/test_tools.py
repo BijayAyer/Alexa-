@@ -49,3 +49,24 @@ def test_short_model_quiz_is_filled_from_notes(monkeypatch):
 
     assert server.start_quiz("Biology", 3).startswith("Question 1 of 3:")
     assert db.quiz_score(db.get_active_question()["session_id"])[1] == 3
+
+
+def test_answer_from_notes_uses_matching_saved_sentences(monkeypatch):
+    server.add_notes("Biology", "Plants use sunlight to make glucose. Chlorophyll absorbs light.")
+    prompts = []
+
+    def complete(system, prompt):
+        prompts.append(prompt)
+        return "Plants use sunlight to make glucose."
+
+    monkeypatch.setattr(server.llm, "complete", complete)
+
+    assert server.answer_from_notes("What do plants make?", "Biology") == "Plants use sunlight to make glucose."
+    assert "Plants use sunlight to make glucose." in prompts[0]
+    assert "Chlorophyll absorbs light." not in prompts[0]
+
+
+def test_answer_from_notes_refuses_when_no_matching_material_exists():
+    server.add_notes("Biology", "Plants use sunlight to make glucose.")
+
+    assert server.answer_from_notes("Who wrote Hamlet?", "Biology") == "I couldn't find that in your saved study material."

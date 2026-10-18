@@ -2,6 +2,7 @@
 
 ## 2026-10-18
 
+- The installed pypdf `PageObject` has no `add_text()` helper, so the first extractable-PDF test fixture failed. Replaced it with documented pypdf generic stream and dictionary objects; upload extraction tests now pass.
 - `uv sync --extra dev` initially failed because the package metadata referenced a missing `README.md`. Added the small README before retrying; the package then built and installed.
 - The current MCP SDK docs describe v2, whose server API is no longer FastMCP. The v1 maintenance docs and installed `mcp 1.30.0` confirmed `FastMCP.run(transport="streamable-http")` and negotiation of protocol `2025-11-25`; pinned the dependency to `mcp<2` and verified the live handshake.
 - The first Strands docs URLs returned 404 after the docs site moved. Resolved the canonical `/docs/user-guide/sdk/...` pages and checked the installed `MCPClient`, `OpenAIModel`, and `Agent` signatures before implementation.

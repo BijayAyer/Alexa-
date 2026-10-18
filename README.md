@@ -43,6 +43,8 @@ uv run cram-web
 
 Open [http://localhost:8080](http://localhost:8080). The server stores notes and quiz history in `cram.db` in the working directory by default.
 
+Use the **study material** panel to paste notes under a topic or upload a text-based PDF (up to 10 MB and 100 pages). Cram extracts selectable PDF text and saves it with that topic. Scanned/image-only PDFs need OCR before upload. Ask a question such as “What do plants make?” to get an answer grounded in the saved material, or ask for a summary or quiz on that topic. If the model is disabled or unavailable, answers use matching saved text rather than outside knowledge.
+
 To check the MCP tools interactively, run this in another terminal and connect the Inspector to `http://localhost:8000/mcp` using Streamable HTTP:
 
 ```sh

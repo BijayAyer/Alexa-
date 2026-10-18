@@ -42,7 +42,22 @@
         </section>
 
         <aside class="notes" aria-labelledby="notes-heading">
-          <h2 id="notes-heading">your notes</h2>
+          <h2 id="notes-heading">study material</h2>
+          <form id="text-material-form" class="material-form">
+            <label for="material-topic">topic</label>
+            <input id="material-topic" name="topic" type="text" required maxlength="120" placeholder="for example, photosynthesis">
+            <label for="material-text">paste your notes</label>
+            <textarea id="material-text" name="text" rows="5" required maxlength="100000"></textarea>
+            <button id="save-material-button" type="submit">save notes</button>
+          </form>
+          <form id="pdf-material-form" class="material-form">
+            <label for="material-pdf">or add a text-based PDF</label>
+            <input id="material-pdf" name="file" type="file" accept="application/pdf,.pdf" required>
+            <button id="upload-pdf-button" type="submit">upload PDF</button>
+            <p class="material-note">Scanned PDFs need OCR first. Maximum 10 MB and 100 pages.</p>
+          </form>
+          <p id="material-status" class="status" role="status" aria-live="polite"></p>
+          <h3 class="saved-heading">saved topics</h3>
           <div id="topic-list" class="topic-list" aria-live="polite"></div>
           <button id="reset-button" type="button">reset conversation</button>
         </aside>
