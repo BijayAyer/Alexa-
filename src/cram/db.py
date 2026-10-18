@@ -11,8 +11,8 @@ DB_PATH = Path(os.getenv("CRAM_DB_PATH", "cram.db"))
 
 
 @contextmanager
-def _connection(db_path: Path = DB_PATH) -> Iterator[sqlite3.Connection]:
-    connection = sqlite3.connect(db_path)
+def _connection(db_path: Path | None = None) -> Iterator[sqlite3.Connection]:
+    connection = sqlite3.connect(db_path or DB_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     try:
@@ -22,7 +22,8 @@ def _connection(db_path: Path = DB_PATH) -> Iterator[sqlite3.Connection]:
         connection.close()
 
 
-def init_db(db_path: Path = DB_PATH) -> None:
+def init_db(db_path: Path | None = None) -> None:
+    db_path = db_path or DB_PATH
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with _connection(db_path) as connection:
         connection.executescript(
@@ -53,8 +54,12 @@ def init_db(db_path: Path = DB_PATH) -> None:
         )
 
 
-def add_note(topic: str, text: str, db_path: Path = DB_PATH) -> int:
+def add_note(topic: str, text: str, db_path: Path | None = None) -> int:
     with _connection(db_path) as connection:
+        existing = connection.execute(
+            "SELECT topic FROM notes WHERE topic = ? COLLATE NOCASE LIMIT 1", (topic,)
+        ).fetchone()
+        topic = existing["topic"] if existing else topic
         cursor = connection.execute(
             "INSERT INTO notes (topic, text, created_at) VALUES (?, ?, ?)",
             (topic, text, datetime.now(timezone.utc).isoformat(timespec="seconds")),
@@ -62,7 +67,7 @@ def add_note(topic: str, text: str, db_path: Path = DB_PATH) -> int:
         return int(cursor.lastrowid)
 
 
-def list_topics(db_path: Path = DB_PATH) -> list[dict[str, str | int]]:
+def list_topics(db_path: Path | None = None) -> list[dict[str, str | int]]:
     with _connection(db_path) as connection:
         rows = connection.execute(
             "SELECT topic, COUNT(*) AS note_count FROM notes GROUP BY topic ORDER BY topic COLLATE NOCASE"
@@ -70,15 +75,15 @@ def list_topics(db_path: Path = DB_PATH) -> list[dict[str, str | int]]:
     return [dict(row) for row in rows]
 
 
-def get_notes(topic: str, db_path: Path = DB_PATH) -> list[str]:
+def get_notes(topic: str, db_path: Path | None = None) -> list[str]:
     with _connection(db_path) as connection:
         rows = connection.execute(
-            "SELECT text FROM notes WHERE topic = ? ORDER BY id", (topic,)
+            "SELECT text FROM notes WHERE topic = ? COLLATE NOCASE ORDER BY id", (topic,)
         ).fetchall()
     return [row["text"] for row in rows]
 
 
-def create_quiz(topic: str, questions: list[dict[str, str]], db_path: Path = DB_PATH) -> int:
+def create_quiz(topic: str, questions: list[dict[str, str]], db_path: Path | None = None) -> int:
     created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with _connection(db_path) as connection:
         connection.execute("UPDATE quiz_sessions SET status = 'finished' WHERE status = 'active'")
@@ -95,7 +100,7 @@ def create_quiz(topic: str, questions: list[dict[str, str]], db_path: Path = DB_
     return session_id
 
 
-def get_active_question(db_path: Path = DB_PATH) -> dict | None:
+def get_active_question(db_path: Path | None = None) -> dict | None:
     with _connection(db_path) as connection:
         row = connection.execute(
             """
@@ -110,7 +115,7 @@ def get_active_question(db_path: Path = DB_PATH) -> dict | None:
     return dict(row) if row else None
 
 
-def save_answer(question_id: int, user_answer: str, correct: bool, db_path: Path = DB_PATH) -> None:
+def save_answer(question_id: int, user_answer: str, correct: bool, db_path: Path | None = None) -> None:
     with _connection(db_path) as connection:
         connection.execute(
             "UPDATE quiz_questions SET user_answer = ?, correct = ? WHERE id = ?",
@@ -118,12 +123,12 @@ def save_answer(question_id: int, user_answer: str, correct: bool, db_path: Path
         )
 
 
-def finish_quiz(session_id: int, db_path: Path = DB_PATH) -> None:
+def finish_quiz(session_id: int, db_path: Path | None = None) -> None:
     with _connection(db_path) as connection:
         connection.execute("UPDATE quiz_sessions SET status = 'finished' WHERE id = ?", (session_id,))
 
 
-def quiz_accuracy(db_path: Path = DB_PATH) -> list[dict[str, str | int | float]]:
+def quiz_accuracy(db_path: Path | None = None) -> list[dict[str, str | int | float]]:
     with _connection(db_path) as connection:
         rows = connection.execute(
             """
@@ -143,7 +148,7 @@ def quiz_accuracy(db_path: Path = DB_PATH) -> list[dict[str, str | int | float]]
     return sorted(results, key=lambda item: (item["accuracy"], str(item["topic"]).casefold()))
 
 
-def last_quiz_scores(db_path: Path = DB_PATH) -> list[dict[str, str | int]]:
+def last_quiz_scores(db_path: Path | None = None) -> list[dict[str, str | int]]:
     with _connection(db_path) as connection:
         rows = connection.execute(
             """
@@ -163,3 +168,16 @@ def last_quiz_scores(db_path: Path = DB_PATH) -> list[dict[str, str | int]]:
             "topic": row["topic"], "correct": row["correct"], "total": row["total"]
         })
     return list(latest.values())
+
+
+def quiz_score(session_id: int, db_path: Path | None = None) -> tuple[int, int]:
+    with _connection(db_path) as connection:
+        row = connection.execute(
+            """
+            SELECT COALESCE(SUM(CASE WHEN correct = 1 THEN 1 ELSE 0 END), 0) AS correct,
+                   COUNT(*) AS total
+            FROM quiz_questions WHERE session_id = ?
+            """,
+            (session_id,),
+        ).fetchone()
+    return row["correct"], row["total"]
